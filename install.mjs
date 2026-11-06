@@ -7,12 +7,18 @@ import { fileURLToPath } from 'node:url';
 
 const SHELLS = ['posix', 'gitbash', 'powershell'];
 const LAUNCHER = fileURLToPath(new URL('./scripts/statusline.mjs', import.meta.url));
+// Where Claude Code looks for Git Bash when CLAUDE_CODE_GIT_BASH_PATH is unset.
+const GIT_BASH_DEFAULTS = ['C:\\Program Files\\Git\\bin\\bash.exe', 'C:\\Program Files (x86)\\Git\\bin\\bash.exe'];
 
 // Claude Code runs statusLine through bash on macOS, Linux and WSL. On Windows it uses Git Bash
-// when installed (which sets MSYSTEM for the commands Claude runs), otherwise PowerShell.
-export function detectShell(env = process.env, platform = process.platform) {
+// when installed (which sets MSYSTEM for the commands Claude runs), otherwise PowerShell. install
+// itself usually runs from PowerShell, where MSYSTEM/SHELL are unset, so also probe for a Git Bash
+// like Claude Code does before falling back to the cmd.exe form (#861).
+export function detectShell(env = process.env, platform = process.platform, exists = fs.existsSync) {
   if (platform !== 'win32') return 'posix';
-  return env.MSYSTEM || /bash/i.test(env.SHELL ?? '') ? 'gitbash' : 'powershell';
+  if (env.MSYSTEM || /bash/i.test(env.SHELL ?? '')) return 'gitbash';
+  if (env.CLAUDE_CODE_GIT_BASH_PATH && exists(env.CLAUDE_CODE_GIT_BASH_PATH)) return 'gitbash';
+  return GIT_BASH_DEFAULTS.some((file) => exists(file)) ? 'gitbash' : 'powershell';
 }
 
 const quote = (value) => `'${value.replaceAll("'", `'\\''`)}'`;

@@ -177,5 +177,13 @@ test('install picks the shell Claude Code runs statusLine with', async () => {
   assert.equal(detectShell({}, 'darwin'), 'posix');
   assert.equal(detectShell({ MSYSTEM: 'MINGW64' }, 'win32'), 'gitbash');
   assert.equal(detectShell({ SHELL: '/usr/bin/bash' }, 'win32'), 'gitbash');
-  assert.equal(detectShell({}, 'win32'), 'powershell');
+  assert.equal(detectShell({}, 'win32', () => false), 'powershell');
+  // install itself runs from PowerShell, where MSYSTEM/SHELL are unset, but Claude Code still
+  // runs statusLine through Git Bash when it has one (#861): probe the places it looks.
+  assert.equal(
+    detectShell({ CLAUDE_CODE_GIT_BASH_PATH: 'C:\\Git\\bin\\bash.exe' }, 'win32', (file) => file === 'C:\\Git\\bin\\bash.exe'),
+    'gitbash',
+  );
+  assert.equal(detectShell({ CLAUDE_CODE_GIT_BASH_PATH: 'C:\\gone\\bash.exe' }, 'win32', () => false), 'powershell');
+  assert.equal(detectShell({}, 'win32', (file) => file === 'C:\\Program Files\\Git\\bin\\bash.exe'), 'gitbash');
 });
